@@ -22,6 +22,7 @@
 	<!-- Buttons and links -->
 
 	<a href="" ng-click="open()">Open via service</a>
+	<a href="" ng-click="openWithResolve()">Open via service with resolve object</a>
 	<button type="button"
 		ng-dialog="firstDialogId"
 		ng-dialog-controller="InsideCtrl"
@@ -152,6 +153,23 @@
 
 			$scope.open = function () {
 				ngDialog.open({ template: 'firstDialogId', controller: 'InsideCtrl', data: {foo: 'some data'} });
+			};
+
+			$scope.openWithResolve = function () {
+				ngDialog.open({ template: 'firstDialogId', controller: 'ResolveCtrl', resolve: {
+					RESOLVED_DATA: function () {
+						return 'some data';
+					},
+					PROMISED_DATA: function ($q) {
+						var deferred = $q.defer();
+
+						setTimeout(function () {
+							deferred.resolve('Promissed data with delay in 1000ms');
+						}, 1000);
+
+						return deferred.promise;
+					}
+				} });
 			};
 
 			$scope.openDefault = function () {
@@ -316,6 +334,10 @@
 				});
 			};
 
+			$rootScope.$on('ngDialog.resolving', function (e, $dialog) {
+				console.log('ngDialog resolving dependencies: ' + $dialog.attr('id'));
+			});
+
 			$rootScope.$on('ngDialog.opened', function (e, $dialog) {
 				console.log('ngDialog opened: ' + $dialog.attr('id'));
 			});
@@ -328,6 +350,13 @@
 				console.log('ngDialog closing: ' + $dialog.attr('id'));
 			});
 		});
+
+		app.controller('ResolveCtrl', function ($scope, RESOLVED_DATA, PROMISED_DATA) {
+			$scope.dialogModel = {
+				message : RESOLVED_DATA + ' + ' + PROMISED_DATA
+			};
+		});
+
 
 		app.controller('InsideCtrl', function ($scope, ngDialog) {
 			$scope.dialogModel = {

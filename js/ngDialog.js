@@ -52,8 +52,8 @@
 
 		var globalID = 0, dialogsCount = 0, closeByDocumentHandler, defers = {};
 
-		this.$get = ['$document', '$templateCache', '$compile', '$q', '$http', '$rootScope', '$timeout', '$window', '$controller',
-			function ($document, $templateCache, $compile, $q, $http, $rootScope, $timeout, $window, $controller) {
+		this.$get = ['$document', '$templateCache', '$compile', '$q', '$http', '$rootScope', '$timeout', '$window', '$controller', '$injector',
+			function ($document, $templateCache, $compile, $q, $http, $rootScope, $timeout, $window, $controller, $injector) {
 				var $body = $document.find('body');
 				if (forceBodyReload) {
 					$rootScope.$on('$locationChangeSuccess', function () {
@@ -214,96 +214,119 @@
 								scope.ngDialogData = (firstLetter === '{' || firstLetter === '[') ? angular.fromJson(options.data) : options.data;
 							} else if (options.data && angular.isObject(options.data)) {
 								scope.ngDialogData = options.data;
-							}
-
-							if (options.controller && (angular.isString(options.controller) || angular.isArray(options.controller) || angular.isFunction(options.controller))) {
-								var controllerInstance = $controller(options.controller, {
-									$scope: scope,
-									$element: $dialog
-								});
-								$dialog.data('$ngDialogControllerController', controllerInstance);
-							}
-
-							if (options.className) {
-								$dialog.addClass(options.className);
-							}
-
-							if (options.appendTo && angular.isString(options.appendTo)) {
-								$dialogParent = angular.element(document.querySelector(options.appendTo));
 							} else {
-								$dialogParent = $body;
+								scope.ngDialogData = {};
 							}
 
-							if (options.preCloseCallback) {
-								var preCloseCallback;
+							if (options.resolve && angular.isObject(options.resolve)) {
+					            angular.forEach(options.resolve, function(value, key) {
+									options.resolve[key] = angular.isString(value) ? $injector.get(value) : $injector.invoke(value);
+					            });
 
-								if (angular.isFunction(options.preCloseCallback)) {
-									preCloseCallback = options.preCloseCallback;
-								} else if (angular.isString(options.preCloseCallback)) {
-									if (scope) {
-										if (angular.isFunction(scope[options.preCloseCallback])) {
-											preCloseCallback = scope[options.preCloseCallback];
-										} else if (scope.$parent && angular.isFunction(scope.$parent[options.preCloseCallback])) {
-											preCloseCallback = scope.$parent[options.preCloseCallback];
-										} else if ($rootScope && angular.isFunction($rootScope[options.preCloseCallback])) {
-											preCloseCallback = $rootScope[options.preCloseCallback];
+								$rootScope.$broadcast('ngDialog.resolving', $dialog);
+
+					            return $q
+					                .all(options.resolve)
+					                .then(function (resolved) {
+					                    angular.extend(scope.ngDialogData, resolved);
+					                    completeOpen(resolved);
+					                });
+							} else {
+								completeOpen();
+							}
+
+							function completeOpen(resolvedData) {
+								if (options.controller && (angular.isString(options.controller) || angular.isArray(options.controller) || angular.isFunction(options.controller))) {
+									var baseLocals = {
+										$scope: scope,
+										$element: $dialog
+									};
+									var locals = angular.extend(baseLocals, resolvedData || {});
+									var controllerInstance = $controller(options.controller, locals);
+									$dialog.data('$ngDialogControllerController', controllerInstance);
+								}
+
+								if (options.className) {
+									$dialog.addClass(options.className);
+								}
+
+								if (options.appendTo && angular.isString(options.appendTo)) {
+									$dialogParent = angular.element(document.querySelector(options.appendTo));
+								} else {
+									$dialogParent = $body;
+								}
+
+								if (options.preCloseCallback) {
+									var preCloseCallback;
+
+									if (angular.isFunction(options.preCloseCallback)) {
+										preCloseCallback = options.preCloseCallback;
+									} else if (angular.isString(options.preCloseCallback)) {
+										if (scope) {
+											if (angular.isFunction(scope[options.preCloseCallback])) {
+												preCloseCallback = scope[options.preCloseCallback];
+											} else if (scope.$parent && angular.isFunction(scope.$parent[options.preCloseCallback])) {
+												preCloseCallback = scope.$parent[options.preCloseCallback];
+											} else if ($rootScope && angular.isFunction($rootScope[options.preCloseCallback])) {
+												preCloseCallback = $rootScope[options.preCloseCallback];
+											}
 										}
+									}
+
+									if (preCloseCallback) {
+										$dialog.data('$ngDialogPreCloseCallback', preCloseCallback);
 									}
 								}
 
-								if (preCloseCallback) {
-									$dialog.data('$ngDialogPreCloseCallback', preCloseCallback);
-								}
-							}
+								scope.closeThisDialog = function (value) {
+									privateMethods.closeDialog($dialog, value);
+								};
 
-							scope.closeThisDialog = function (value) {
-								privateMethods.closeDialog($dialog, value);
-							};
+								$timeout(function () {
+									$compile($dialog)(scope);
+									var widthDiffs = $window.innerWidth - $body.prop('clientWidth');
+									$body.addClass('ngdialog-open');
+									var scrollBarWidth = widthDiffs - ($window.innerWidth - $body.prop('clientWidth'));
+									if (scrollBarWidth > 0) {
+										privateMethods.setBodyPadding(scrollBarWidth);
+									}
+									$dialogParent.append($dialog);
 
-							$timeout(function () {
-								$compile($dialog)(scope);
-								var widthDiffs = $window.innerWidth - $body.prop('clientWidth');
-								$body.addClass('ngdialog-open');
-								var scrollBarWidth = widthDiffs - ($window.innerWidth - $body.prop('clientWidth'));
-								if (scrollBarWidth > 0) {
-									privateMethods.setBodyPadding(scrollBarWidth);
-								}
-								$dialogParent.append($dialog);
-
-								if (options.name) {
-									$rootScope.$broadcast('ngDialog.opened', {dialog: $dialog, name: options.name});
-								} else {
-									$rootScope.$broadcast('ngDialog.opened', $dialog);
-								}
-							});
-
-							if (options.closeByEscape) {
-								$body.bind('keydown', privateMethods.onDocumentKeydown);
-							}
-
-							if (options.closeByNavigation) {
-								$rootScope.$on('$locationChangeSuccess', function () {
-									privateMethods.closeDialog($dialog);
+									if (options.name) {
+										$rootScope.$broadcast('ngDialog.opened', {dialog: $dialog, name: options.name});
+									} else {
+										$rootScope.$broadcast('ngDialog.opened', $dialog);
+									}
 								});
-							}
 
-							closeByDocumentHandler = function (event) {
-								var isOverlay = options.closeByDocument ? $el(event.target).hasClass('ngdialog-overlay') : false;
-								var isCloseBtn = $el(event.target).hasClass('ngdialog-close');
-
-								if (isOverlay || isCloseBtn) {
-									publicMethods.close($dialog.attr('id'), isCloseBtn ? '$closeButton' : '$document');
+								if (options.closeByEscape) {
+									$body.bind('keydown', privateMethods.onDocumentKeydown);
 								}
-							};
 
-							if (typeof $window.Hammer !== 'undefined') {
-								var hammerTime = scope.hammerTime = $window.Hammer($dialog[0]);
-								hammerTime.on('tap', closeByDocumentHandler);
-							} else {
-								$dialog.bind('click', closeByDocumentHandler);
+								if (options.closeByNavigation) {
+									$rootScope.$on('$locationChangeSuccess', function () {
+										privateMethods.closeDialog($dialog);
+									});
+								}
+
+								closeByDocumentHandler = function (event) {
+									var isOverlay = options.closeByDocument ? $el(event.target).hasClass('ngdialog-overlay') : false;
+									var isCloseBtn = $el(event.target).hasClass('ngdialog-close');
+
+									if (isOverlay || isCloseBtn) {
+										publicMethods.close($dialog.attr('id'), isCloseBtn ? '$closeButton' : '$document');
+									}
+								};
+
+								if (typeof $window.Hammer !== 'undefined') {
+									var hammerTime = scope.hammerTime = $window.Hammer($dialog[0]);
+									hammerTime.on('tap', closeByDocumentHandler);
+								} else {
+									$dialog.bind('click', closeByDocumentHandler);
+								}
+
+								dialogsCount += 1;
 							}
-
-							dialogsCount += 1;
 
 							return publicMethods;
 						});
