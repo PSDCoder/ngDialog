@@ -127,6 +127,10 @@ Any value passed to this function will be attached to the object which resolves 
 
 Any serializable data that you want to be stored in controller's dialog scope. (``$scope.ngDialogData``). From version `0.3.6` `$scope.ngDialogData` keeps references to the objects instead of copying them.
 
+##### ``resolve {Object}``
+
+This property works like in ngRoute and ui.router configuration. Keys of this object we can inject to dialog controller and therefore reuse controllers from our application.
+
 ##### ``className {String}``
 
 This option allows you to control the dialog's look, you can use built-in [themes](https://github.com/likeastore/ngDialog#themes) or create your own styled modals.
@@ -339,6 +343,8 @@ Directive contains one more additional but very useful option, it's an attribute
 
 Everytime when ngDialog is opened or closed we're broadcasting three events (dispatching events downwards to all child scopes):
 
+- ``ngDialog.resolving``
+
 - ``ngDialog.opened``
 
 - ``ngDialog.closing``
@@ -352,6 +358,8 @@ $rootScope.$on('ngDialog.opened', function (e, $dialog) {
 	console.log('ngDialog opened: ' + $dialog.attr('id'));
 });
 ```
+
+``ngDialog.resolving`` fires when isset resolve key in options and when started internal resolving of this dependencies.
 
 ``ngDialog.closing`` is different than ``ngDialog.closed`` in that it is fired immediately when the dialog begins closing, whereas ``ngDialog.closed`` is fired after all animations are complete. Both will be fired even when animation end support is not detected.
 
