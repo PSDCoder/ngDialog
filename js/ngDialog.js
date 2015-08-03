@@ -204,10 +204,9 @@
 								template += '<div class="ngdialog-close"></div>';
 							}
 
-							self.$result = $dialog = $el('<div id="ngdialog' + globalID + '" class="ngdialog"></div>');
-							$dialog.html((options.overlay ?
-								'<div class="ngdialog-overlay"></div><div class="ngdialog-content">' + template + '</div>' :
-								'<div class="ngdialog-content">' + template + '</div>'));
+							self.$result = $dialog = $el('<div id="ngdialog' + globalID + '" class="ngdialog' +
+								(options.overlay ? ' ngdialog-overlay' : '') + '"></div>');
+							$dialog.html('<div class="ngdialog-content">' + template + '</div>');
 
 							if (options.data && angular.isString(options.data)) {
 								var firstLetter = options.data.replace(/^\s*/, '')[0];
@@ -310,7 +309,7 @@
 								}
 
 								closeByDocumentHandler = function (event) {
-									var isOverlay = options.closeByDocument ? $el(event.target).hasClass('ngdialog-overlay') : false;
+									var isOverlay = options.closeByDocument ? $el(event.target).hasClass('ngdialog') : false;
 									var isCloseBtn = $el(event.target).hasClass('ngdialog-close');
 
 									if (isOverlay || isCloseBtn) {
